@@ -6,6 +6,11 @@ name: baseline-og-verifisering
 # et testvarsel til ntfy-topicet.
 
 on:
+  push:
+    branches:
+      - claude/fotballfesten-ticket-watch-8e8g9s
+    paths-ignore:
+      - baseline_sitemap.txt
   workflow_dispatch:
     inputs:
       ntfy_topic:
