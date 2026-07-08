@@ -3,6 +3,9 @@ name: fotballfesten-vakt
 on:
   schedule:
     - cron: "*/15 * * * *"
+  push:
+    branches:
+      - main
   workflow_dispatch: {}
 
 concurrency:
