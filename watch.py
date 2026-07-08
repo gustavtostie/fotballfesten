@@ -55,13 +55,39 @@ def notify(key: str, title: str, message: str):
         "Tags": "rotating_light,soccer",
         "Click": PAGE_URL,
     }
-    if ALERT_EMAIL:
-        headers["Email"] = ALERT_EMAIL
+    # 1) Push - viktigste kanal. Sendes ALLTID uten Email-header, fordi
+    #    ntfy.sh avviser hele meldingen (HTTP 400) hvis Email er med
+    #    uten betalt ntfy-konto - da hadde heller ikke pushen gått ut.
     try:
         requests.post(f"https://ntfy.sh/{NTFY_TOPIC}",
                       data=message.encode("utf-8"), headers=headers, timeout=10)
     except Exception as e:
         print(f"ntfy-feil: {e}", flush=True)
+    # 2) E-post via ntfy - best effort, krever betalt ntfy-konto.
+    if ALERT_EMAIL:
+        try:
+            r = requests.post(f"https://ntfy.sh/{NTFY_TOPIC}",
+                              data=message.encode("utf-8"),
+                              headers={**headers, "Email": ALERT_EMAIL},
+                              timeout=10)
+            if r.status_code >= 400:
+                print(f"ntfy e-post avvist ({r.status_code}): {r.text}",
+                      flush=True)
+        except Exception as e:
+            print(f"ntfy e-postfeil: {e}", flush=True)
+    # 3) GitHub-issue - GitHub e-poster alle som watcher repoet.
+    token = os.environ.get("GITHUB_TOKEN", "")
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if token and repo:
+        try:
+            requests.post(
+                f"https://api.github.com/repos/{repo}/issues",
+                json={"title": title, "body": message},
+                headers={"Authorization": f"Bearer {token}",
+                         "Accept": "application/vnd.github+json"},
+                timeout=10)
+        except Exception as e:
+            print(f"github-issue-feil: {e}", flush=True)
 
 
 def fetch(url: str) -> str:

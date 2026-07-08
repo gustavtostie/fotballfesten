@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   baseline:
@@ -81,18 +82,33 @@ jobs:
         env:
           NTFY_TOPIC: ${{ inputs.ntfy_topic || secrets.NTFY_TOPIC }}
           ALERT_EMAIL: ${{ inputs.alert_email || secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$NTFY_TOPIC" ]; then
             echo "::error::NTFY_TOPIC er tom - secret er ikke satt i repoet ennå"
             exit 1
           fi
+          # 1) Push (uten Email-header - ntfy.sh avviser alt hvis den er med)
+          status=$(curl -s -o /tmp/push.json -w "%{http_code}" \
+            -d "Vakten er aktiv og overvåker fotballfesten.no. Dette er en test." \
+            -H "Title: ✅ Fotballfesten-vakt kjører" \
+            "https://ntfy.sh/$NTFY_TOPIC")
+          echo "ntfy push: HTTP $status"
+          cat /tmp/push.json; echo
+          test "$status" -lt 400
+          # 2) E-post via ntfy - best effort, krever betalt ntfy-konto
           if [ -n "$ALERT_EMAIL" ]; then
+            echo "ntfy e-postforsøk:"
             curl -s -d "Vakten er aktiv og overvåker fotballfesten.no. Dette er en test." \
               -H "Title: ✅ Fotballfesten-vakt kjører" \
               -H "Email: $ALERT_EMAIL" \
-              "https://ntfy.sh/$NTFY_TOPIC"
-          else
-            curl -s -d "Vakten er aktiv og overvåker fotballfesten.no. Dette er en test." \
-              -H "Title: ✅ Fotballfesten-vakt kjører" \
-              "https://ntfy.sh/$NTFY_TOPIC"
+              "https://ntfy.sh/$NTFY_TOPIC" || true
+            echo
           fi
+          # 3) Test-issue - GitHub e-poster alle som watcher repoet
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues" \
+            -d '{"title":"✅ Test: Fotballfesten-vakt kjører","body":"Dette er et testvarsel fra vakten. Alle som *watcher* dette repoet får e-post fra GitHub når vakten oppretter et issue ved billettslipp. Lukk gjerne dette issuet."}' \
+            | grep -o '"html_url": *"[^"]*issues/[0-9]*"' | head -1

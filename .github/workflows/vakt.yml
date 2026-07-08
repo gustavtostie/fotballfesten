@@ -9,6 +9,10 @@ concurrency:
   group: vakt
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   watch:
     runs-on: ubuntu-latest
@@ -23,5 +27,6 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_MINUTES: "25"
         run: python watch.py
