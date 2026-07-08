@@ -1,0 +1,86 @@
+name: baseline-og-verifisering
+
+# Engangs-hjelpeworkflow: genererer baseline_sitemap.txt fra live-siden,
+# verifiserer at vakten ikke gir falske alarmer mot baseline, kjører en
+# kort loop-test, committer baselinen til branchen og sender (valgfritt)
+# et testvarsel til ntfy-topicet.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ntfy_topic:
+        description: "ntfy-topic for testvarsel (tomt = ikke send)"
+        required: false
+        default: ""
+      alert_email:
+        description: "e-post som også skal få testvarselet"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+
+      - name: Generer baseline fra live-siden
+        run: |
+          curl -s https://www.fotballfesten.no/sitemap.xml | grep -oP '(?<=<loc>)[^<]+' | sort > baseline_sitemap.txt
+          echo "Antall URL-er: $(wc -l < baseline_sitemap.txt)"
+          cat baseline_sitemap.txt
+          grep -q '/frognerstadion' baseline_sitemap.txt || { echo "MANGLER /frognerstadion"; exit 1; }
+          grep -q '/store' baseline_sitemap.txt || { echo "MANGLER /store"; exit 1; }
+          test "$(wc -l < baseline_sitemap.txt)" -ge 20 || { echo "FOR FÅ URL-ER I SITEMAP"; exit 1; }
+
+      - name: Dry-run - verifiser at baseline ikke gir falske alarmer
+        run: |
+          python - <<'EOF'
+          import os
+          os.environ['NTFY_TOPIC'] = 'dryrun'
+          import watch
+          alerts = []
+          watch.notify = lambda k, t, m: alerts.append((t, m))
+          watch.check_once()
+          print('Varsler utløst:', len(alerts))
+          assert len(alerts) == 0, f'FALSK ALARM VED BASELINE: {alerts}'
+          print('OK - ingen falske alarmer, baseline stemmer')
+          EOF
+
+      - name: Kort loop-test (1 minutt)
+        env:
+          NTFY_TOPIC: dryrun
+          RUN_MINUTES: "1"
+        run: python watch.py
+
+      - name: Commit baseline til branchen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add baseline_sitemap.txt
+          git diff --cached --quiet || git commit -m "Baseline: sitemap-URL-er fra fotballfesten.no"
+          git push
+
+      - name: Send testvarsel
+        if: ${{ inputs.ntfy_topic != '' }}
+        env:
+          NTFY_TOPIC: ${{ inputs.ntfy_topic }}
+          ALERT_EMAIL: ${{ inputs.alert_email }}
+        run: |
+          if [ -n "$ALERT_EMAIL" ]; then
+            curl -s -d "Vakten er aktiv og overvåker fotballfesten.no. Dette er en test." \
+              -H "Title: ✅ Fotballfesten-vakt kjører" \
+              -H "Email: $ALERT_EMAIL" \
+              "https://ntfy.sh/$NTFY_TOPIC"
+          else
+            curl -s -d "Vakten er aktiv og overvåker fotballfesten.no. Dette er en test." \
+              -H "Title: ✅ Fotballfesten-vakt kjører" \
+              "https://ntfy.sh/$NTFY_TOPIC"
+          fi
