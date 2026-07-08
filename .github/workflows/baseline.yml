@@ -8,6 +8,7 @@ name: baseline-og-verifisering
 on:
   push:
     branches:
+      - main
       - claude/fotballfesten-ticket-watch-8e8g9s
     paths-ignore:
       - baseline_sitemap.txt
@@ -74,11 +75,17 @@ jobs:
           git push
 
       - name: Send testvarsel
-        if: ${{ inputs.ntfy_topic != '' }}
+        # Kjøres når workflowen trigges manuelt med topic-input, ELLER når
+        # commit-meldingen inneholder [test] (da brukes repo-secrets).
+        if: ${{ inputs.ntfy_topic != '' || contains(github.event.head_commit.message, '[test]') }}
         env:
-          NTFY_TOPIC: ${{ inputs.ntfy_topic }}
-          ALERT_EMAIL: ${{ inputs.alert_email }}
+          NTFY_TOPIC: ${{ inputs.ntfy_topic || secrets.NTFY_TOPIC }}
+          ALERT_EMAIL: ${{ inputs.alert_email || secrets.ALERT_EMAIL }}
         run: |
+          if [ -z "$NTFY_TOPIC" ]; then
+            echo "::error::NTFY_TOPIC er tom - secret er ikke satt i repoet ennå"
+            exit 1
+          fi
           if [ -n "$ALERT_EMAIL" ]; then
             curl -s -d "Vakten er aktiv og overvåker fotballfesten.no. Dette er en test." \
               -H "Title: ✅ Fotballfesten-vakt kjører" \
