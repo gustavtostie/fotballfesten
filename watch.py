@@ -13,6 +13,7 @@ Miljøvariabler:
   RUN_MINUTES  (valgfri)  - hvor lenge jobben looper (default 25)
 """
 
+import json
 import os
 import random
 import re
@@ -41,18 +42,46 @@ BASELINE_SITEMAP = set(
     Path(__file__).with_name("baseline_sitemap.txt").read_text().split()
 )
 
+# Mykt signal: nye lenker på nøkkelsider = "sjekk ut", ikke full alarm.
+SOFT_PAGES = [
+    "https://www.fotballfesten.no/",
+    PAGE_URL,
+    "https://www.fotballfesten.no/infofrogner",
+    STORE_URL,
+]
+_links_file = Path(__file__).with_name("baseline_links.json")
+SOFT_BASELINE = json.loads(_links_file.read_text()) if _links_file.exists() else {}
+
 already_alerted: set = set()
 
 
-def notify(key: str, title: str, message: str):
+def extract_links(html: str) -> set:
+    """Interne lenker på en side, normalisert (uten query/fragment/assets)."""
+    out = set()
+    for link in re.findall(r'href="([^"#]+)"', html):
+        if link.startswith("http") and "fotballfesten.no" not in link:
+            continue
+        link = link.split("?")[0]
+        if link.lower().endswith((".css", ".js", ".ico", ".png", ".jpg",
+                                  ".jpeg", ".gif", ".svg", ".webp", ".pdf",
+                                  ".woff", ".woff2", ".xml")):
+            continue
+        if link:
+            out.add(link)
+    return out
+
+
+def notify(key: str, title: str, message: str,
+           priority: str = "urgent", tags: str = "rotating_light,soccer",
+           github_issue: bool = True):
     if key in already_alerted:
         return
     already_alerted.add(key)
     print(f"\n🚨 {title}\n{message}\n", flush=True)
     headers = {
         "Title": title.encode("utf-8"),
-        "Priority": "urgent",
-        "Tags": "rotating_light,soccer",
+        "Priority": priority,
+        "Tags": tags,
         "Click": PAGE_URL,
     }
     # 1) Push - viktigste kanal. Sendes ALLTID uten Email-header, fordi
@@ -78,7 +107,7 @@ def notify(key: str, title: str, message: str):
     # 3) GitHub-issue - GitHub e-poster alle som watcher repoet.
     token = os.environ.get("GITHUB_TOKEN", "")
     repo = os.environ.get("GITHUB_REPOSITORY", "")
-    if token and repo:
+    if github_issue and token and repo:
         try:
             requests.post(
                 f"https://api.github.com/repos/{repo}/issues",
@@ -124,6 +153,28 @@ def check_once():
                "\n".join(sorted(new)))
 
 
+def check_soft():
+    """Belte og bukseseler: nye lenker på nøkkelsider gir en mildere
+    'sjekk ut'-push (uten GitHub-issue, uten urgent-prioritet)."""
+    if not SOFT_BASELINE:
+        return
+    for url in SOFT_PAGES:
+        base = set(SOFT_BASELINE.get(url, []))
+        if not base:
+            continue
+        try:
+            links = extract_links(fetch(url))
+        except Exception as e:
+            print(f"soft-feil {url}: {e}", flush=True)
+            continue
+        new = links - base
+        if new:
+            notify("soft:" + url + ":" + ",".join(sorted(new)),
+                   "👀 Mindre endring på fotballfesten.no - sjekk ut",
+                   f"Nye lenker på {url}:\n" + "\n".join(sorted(new)),
+                   priority="default", tags="eyes", github_issue=False)
+
+
 def heartbeat():
     """Stille status-push ved rundestart, så man ser at vakten lever."""
     try:
@@ -145,9 +196,12 @@ def main():
     print(f"Vakt kjører i {RUN_MINUTES} min, sjekker hvert ~{POLL_SECONDS}s",
           flush=True)
     heartbeat()
+    n = 0
     while time.time() < deadline:
         try:
             check_once()
+            if n % 4 == 0:
+                check_soft()
             errors = 0
             print(f"[{time.strftime('%H:%M:%S')}] ok", flush=True)
         except Exception as e:
@@ -158,6 +212,7 @@ def main():
                 notify("errors", "⚠️ Vakten sliter",
                        f"10 feil på rad, siste: {e}")
                 errors = 0
+        n += 1
         time.sleep(POLL_SECONDS + random.uniform(0, 5))
     print("Ferdig med denne runden - neste cron tar over.", flush=True)
 
