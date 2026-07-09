@@ -124,11 +124,27 @@ def check_once():
                "\n".join(sorted(new)))
 
 
+def heartbeat():
+    """Stille status-push ved rundestart, så man ser at vakten lever."""
+    try:
+        requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            data=(f"Vakten kjører - ny runde på {RUN_MINUTES} min startet. "
+                  "Ingen varsel = ingen endring på siden.").encode("utf-8"),
+            headers={"Title": "💚 Vakt-status: alt ok".encode("utf-8"),
+                     "Priority": "low",
+                     "Tags": "green_heart"},
+            timeout=10)
+    except Exception as e:
+        print(f"heartbeat-feil: {e}", flush=True)
+
+
 def main():
     deadline = time.time() + RUN_MINUTES * 60
     errors = 0
     print(f"Vakt kjører i {RUN_MINUTES} min, sjekker hvert ~{POLL_SECONDS}s",
           flush=True)
+    heartbeat()
     while time.time() < deadline:
         try:
             check_once()

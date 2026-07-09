@@ -19,7 +19,10 @@ permissions:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # GitHub-cron er upålitelig (observert 3+ timers hull mellom fyringer).
+    # Lange runder gjør at én kjøring dekker hullene; concurrency-køen
+    # sørger for at neste runde tar over sømløst.
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,5 +34,5 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_MINUTES: "25"
+          RUN_MINUTES: "340"
         run: python watch.py
