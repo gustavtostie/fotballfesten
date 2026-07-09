@@ -1,0 +1,59 @@
+{
+ "https://www.fotballfesten.no/": [
+  "/",
+  "/cart",
+  "/faq-kongens-gate",
+  "/faq-ullevaal",
+  "/frognerstadion",
+  "/home-3-1",
+  "/nyheter",
+  "/privacy-policy",
+  "/privacy-policy-1-1",
+  "/terms",
+  "https://www.fotballfesten.no",
+  "mailto:info@fotballfesten.no",
+  "mailto:partner@fotballfesten.no"
+ ],
+ "https://www.fotballfesten.no/frognerstadion": [
+  "/",
+  "/cart",
+  "/faq-kongens-gate",
+  "/faq-ullevaal",
+  "/nyheter",
+  "/privacy-policy",
+  "/privacy-policy-1-1",
+  "/terms",
+  "https://www.fotballfesten.no/faq-frogner",
+  "https://www.fotballfesten.no/frognerstadion",
+  "https://www.fotballfesten.no/infofrogner",
+  "https://www.fotballfesten.no/transportfrogner",
+  "mailto:info@fotballfesten.no",
+  "mailto:partner@fotballfesten.no"
+ ],
+ "https://www.fotballfesten.no/infofrogner": [
+  "/",
+  "/cart",
+  "/faq-kongens-gate",
+  "/faq-ullevaal",
+  "/nyheter",
+  "/privacy-policy",
+  "/privacy-policy-1-1",
+  "/terms",
+  "https://www.fotballfesten.no/infofrogner",
+  "mailto:info@fotballfesten.no",
+  "mailto:partner@fotballfesten.no"
+ ],
+ "https://www.fotballfesten.no/store": [
+  "/",
+  "/cart",
+  "/faq-kongens-gate",
+  "/faq-ullevaal",
+  "/nyheter",
+  "/privacy-policy",
+  "/privacy-policy-1-1",
+  "/terms",
+  "https://www.fotballfesten.no/store",
+  "mailto:info@fotballfesten.no",
+  "mailto:partner@fotballfesten.no"
+ ]
+}
