@@ -50,7 +50,16 @@ SOFT_PAGES = [
     STORE_URL,
 ]
 _links_file = Path(__file__).with_name("baseline_links.json")
-SOFT_BASELINE = json.loads(_links_file.read_text()) if _links_file.exists() else {}
+if _links_file.exists():
+    SOFT_BASELINE = json.loads(_links_file.read_text())
+else:
+    # Fallback: hent baselinen fra main-branchen hvis checkouten mangler den
+    try:
+        SOFT_BASELINE = requests.get(
+            "https://raw.githubusercontent.com/gustavtostie/fotballfesten"
+            "/main/baseline_links.json", timeout=15).json()
+    except Exception:
+        SOFT_BASELINE = {}
 
 already_alerted: set = set()
 
